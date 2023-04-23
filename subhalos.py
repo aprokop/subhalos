@@ -18,6 +18,7 @@ from docopt import docopt
 import hdbscan
 import numpy as np
 import struct
+import sys
 
 
 def read_data(filename, max_num_points):
@@ -39,6 +40,30 @@ def write_data(filename, labels):
         f.write(struct.pack(str(n) + 'i', *labels))
 
 
+def rescale_data(data):
+    assert len(np.shape(data)) == 2 and np.shape(data)[1] == 6, 'Wrong data dimensions'
+    n = np.shape(data)[0]
+    dim = np.shape(data)[1]
+
+    np.set_printoptions(threshold=sys.maxsize)
+    print(data[0:10,:])
+
+    diff = data - np.mean(data, axis=0)
+    disp_sq = np.sum(np.square(diff), axis=0) / n
+    disp_x = np.sqrt(np.sum(disp_sq[0:3]/3))
+    disp_v = np.sqrt(np.sum(disp_sq[3:6]/3))
+    disp = [disp_x, disp_x, disp_x, disp_v, disp_v, disp_v]
+
+    print(disp)
+
+    data = data / disp
+
+    print(data[0:10,:])
+    np.set_printoptions(threshold=False)
+
+    return data
+
+
 if __name__ == '__main__':
 
     # Process input
@@ -54,9 +79,15 @@ if __name__ == '__main__':
     n, dim, points = read_data(input_file, max_num_points)
     print('done\nRead in ' + str(n) + ' ' + str(dim) + 'D points')
 
-    clusterer = hdbscan.HDBSCAN(min_samples=minpts, min_cluster_size=mincluster)
+    if dim == 6:
+        rescale_data(points)
+
+    np.set_printoptions(linewidth=100)
+
+    clusterer = hdbscan.HDBSCAN(min_samples=minpts,
+                                min_cluster_size=mincluster)
     clusterer.fit(points)
 
-    print(f'min_pts = {minpts}, min_cluster_size = {mincluster}: #clusters {str(len(set(clusterer.labels_)))}')
+    print(f'dim = {dim}, min_pts = {minpts}, min_cluster = {mincluster}: #clusters {str(len(set(clusterer.labels_)))}')
 
     write_data(output_file, clusterer.labels_)
